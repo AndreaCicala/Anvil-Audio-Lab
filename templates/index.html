@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anvil Audio Lab</title>
+  <link rel="icon" href="/static/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+  <!-- Header -->
+  <header style="display:flex;align-items:center;gap:24px;padding:28px 40px 24px;border-bottom:1px solid var(--border)">
+    <div class="logo">
+      <span class="logo-icon">▣</span>
+      <span class="logo-text">ANVIL AUDIO LAB</span>
+    </div>
+    <div class="header-sub">Cubase Mix Quality Inspector</div>
+    <nav class="nav-group">
+      <a href="/stems" class="btn-compare">◈ Stems</a>
+      <a href="/master" class="btn-compare">◎ Master</a>
+      <a href="/release" class="btn-compare">✓ Release check</a>
+      <button class="btn-compare" id="btn-history" onclick="toggleHistory()">⏱ History</button>
+    </nav>
+
+  </header>
+
+  <!-- Floating quick-access: History + Stems + Master buttons, fixed to top-right on scroll -->
+  <div class="floating-nav">
+    <a href="/stems" class="floating-nav-btn" title="Stems">◈</a>
+    <a href="/master" class="floating-nav-btn" title="Master">◎</a>
+    <a href="/release" class="floating-nav-btn" title="Release check">✓</a>
+    <button class="floating-nav-btn" onclick="toggleHistory()" title="History">⏱</button>
+  </div>
+
+  <!-- History panel (outside header) -->
+  <div id="history-panel" style="display:none;position:fixed;top:0;right:0;width:320px;height:100vh;background:var(--bg2);border-left:1px solid var(--border);z-index:1000;overflow-y:auto;padding:24px 20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <span style="font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted)">Recent analyses</span>
+      <button onclick="toggleHistory()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <div id="history-list">
+      <div style="font-size:13px;color:var(--muted);text-align:center;padding:40px 0">Loading...</div>
+    </div>
+  </div>
+  <div id="history-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999" onclick="toggleHistory()"></div>
+
+  <!-- Upload Panel -->
+  <main id="upload-panel">
+    <div id="file-info" class="file-info hidden">
+      <span class="file-name" id="file-name-display"></span>
+      <button class="btn-analyze" id="btn-analyze">Analyze mix →</button>
+    </div>
+
+    <div class="upload-area" id="drop-zone">
+      <div class="drop-inner">
+        <div class="drop-icon">◈</div>
+        <p class="drop-title">Drop your mix here</p>
+        <p class="drop-sub">WAV · AIFF · FLAC &nbsp;|&nbsp; Stereo, 44.1 / 48 kHz</p>
+        <!--
+          "Browse file" is a plain button, not a <label for="file-input">.
+          The label/for coupling natively triggers a click on the hidden input
+          whenever the label is clicked — and since the drop zone's click
+          listener ALSO fires a picker via AnvilPicker, clicking "Browse file"
+          was opening TWO dialogs at once (classic <input> + modern picker).
+          Using a button eliminates the implicit input coupling; the drop
+          zone's click handler is the sole entry point now.
+          The hidden <input type="file"> is still used as a fallback by
+          AnvilPicker when the File System Access API isn't available.
+        -->
+        <button type="button" class="btn-upload">Browse file</button>
+        <input type="file" id="file-input" accept=".wav,.aif,.aiff,.flac" hidden />
+      </div>
+    </div>
+
+    <div class="settings-row">
+      <div class="setting-group">
+        <label class="setting-label">Genre</label>
+        <div class="genre-pills" id="genre-pills">
+          <!-- Auto-detect handles everything; the manual pills exist only as
+               a fallback for the specific genres the user produces. Backend
+               detect_genre() still scores against all 10 candidate profiles
+               so "Auto" remains accurate even when the mix is outside this
+               narrow set — only the UI options are trimmed. -->
+          <button class="pill pill-auto active" data-genre="auto">⟳ Auto-detect</button>
+          <button class="pill" data-genre="postrock">Post-Rock</button>
+          <button class="pill" data-genre="progrock">Prog Rock</button>
+          <button class="pill" data-genre="metal">Metal</button>
+          <button class="pill" data-genre="instrumental">Instrumental</button>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <label class="setting-label">Reference track <span class="opt">optional</span></label>
+        <label class="btn-ref" for="ref-input" id="ref-label">+ Add reference</label>
+        <input type="file" id="ref-input" accept=".wav,.aif,.aiff,.flac" hidden />
+      </div>
+    </div>
+  </main>
+
+  <!-- Progress -->
+  <div id="progress-panel" class="hidden">
+    <div class="progress-bar-track"><div class="progress-bar-fill" id="progress-fill"></div></div>
+    <p class="progress-label" id="progress-label">Loading audio…</p>
+  </div>
+
+  <!-- Results Panel -->
+  <section id="results-panel" class="hidden">
+
+    <div class="results-header">
+      <div>
+        <h1 class="results-title" id="results-filename">—</h1>
+        <p class="results-meta" id="results-meta"></p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+        <button class="btn-reset" id="btn-reset">← New analysis</button>
+      </div>
+    </div>
+
+    <!-- Issue summary banner -->
+    <div id="issue-banner" class="issue-banner"></div>
+
+    <!-- Mix version banner (shown when previous version detected) -->
+    <div id="mix-version-banner" style="display:none;margin-top:16px"></div>
+
+    <!-- Mix diff card -->
+    <div class="section-card" id="mix-diff-card" style="display:none;margin-top:24px">
+      <div class="section-head">
+        <span class="section-title" id="mix-diff-title">Version diff</span>
+        <button onclick="closeMixDiffCard()" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px 8px">×</button>
+      </div>
+      <div id="mix-diff-summary" style="font-size:12px;color:var(--muted);margin-bottom:14px"></div>
+      <div id="mix-diff-content"></div>
+    </div>
+
+    <!-- Mix timeline card -->
+    <div class="section-card" id="mix-timeline-card" style="display:none;margin-top:24px">
+      <div class="section-head">
+        <span class="section-title">Project timeline</span>
+        <button onclick="closeMixTimelineCard()" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px 8px">×</button>
+      </div>
+      <div id="mix-timeline-content"></div>
+    </div>
+
+    <!-- Meter strip -->
+    <div class="meter-strip">
+      <div class="meter-card" id="meter-lufs">
+        <div class="meter-value">—</div>
+        <div class="meter-label">LUFS</div>
+        <div class="meter-sub">Integrated loudness</div>
+      </div>
+      <div class="meter-card" id="meter-peak">
+        <div class="meter-value">—</div>
+        <div class="meter-label">True peak</div>
+        <div class="meter-sub">dBFS</div>
+      </div>
+      <div class="meter-card" id="meter-crest">
+        <div class="meter-value">—</div>
+        <div class="meter-label">Crest factor</div>
+        <div class="meter-sub">dB</div>
+      </div>
+      <div class="meter-card" id="meter-corr">
+        <div class="meter-value">—</div>
+        <div class="meter-label">L/R correlation</div>
+        <div class="meter-sub">Phase health</div>
+      </div>
+      <div class="meter-card" id="meter-width">
+        <div class="meter-value">—</div>
+        <div class="meter-label">Stereo width</div>
+        <div class="meter-sub">M/S ratio dB</div>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="section-card" id="timeline-card">
+      <div class="section-head">
+        <span class="section-title">Waveform &amp; loudness</span>
+        <span class="section-badge" id="timeline-badge"></span>
+        <span id="timeline-zoom-indicator" style="margin-left:auto"></span>
+      </div>
+      <div class="timeline-wrap">
+        <canvas id="timeline-canvas" height="140"></canvas>
+        <div class="timeline-labels" id="timeline-labels"></div>
+        <div id="timeline-hover" style="display:none;position:absolute;top:8px;background:rgba(13,13,15,0.92);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px 10px;font-size:11px;font-family:var(--font-mono);pointer-events:none;white-space:nowrap;z-index:10">
+          <span id="hover-time" style="color:var(--accent)"></span>
+          <span id="hover-lufs" style="color:var(--accent2);margin-left:10px"></span>
+          <span id="hover-peak" style="color:var(--danger);margin-left:8px"></span>
+        </div>
+      </div>
+      <div id="peak-timestamps" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(255,95,87,0.06);border:1px solid rgba(255,95,87,0.15);border-radius:6px;font-size:12px;font-family:var(--font-mono);line-height:1.8;word-wrap:break-word;overflow-wrap:break-word">
+        <span style="color:var(--danger);font-weight:500">Peak events: </span>
+        <span id="peak-list" style="color:var(--muted)"></span>
+      </div>
+      <div class="timeline-legend">
+        <span class="tl-dot tl-wave"></span><span>Waveform</span>
+        <span class="tl-dot tl-lufs"></span><span>Short-term LUFS</span>
+        <span class="tl-dot tl-peak"></span><span>Peak event</span>
+        <span class="tl-dot tl-target"></span><span>Streaming target (−14 LUFS)</span>
+      </div>
+    </div>
+
+    <!-- Sections card -->
+    <div class="section-card" id="sections-card" style="display:none">
+      <div class="section-head">
+        <span class="section-title">Song sections</span>
+        <span class="section-badge" id="sections-badge"></span>
+      </div>
+      <div class="sections-summary" id="sections-summary"></div>
+      <div class="sections-strip" id="sections-strip"></div>
+      <div class="sections-callouts" id="sections-callouts"></div>
+      <div class="sections-legend">
+        <span class="legend-dot sec-quiet"></span><span>Quiet</span>
+        <span class="legend-dot sec-medium"></span><span>Medium</span>
+        <span class="legend-dot sec-loud"></span><span>Loud</span>
+        <span class="legend-dot sec-peak"></span><span>Peak</span>
+      </div>
+    </div>
+
+    <!-- Spectrum chart -->
+    <div class="section-card">
+      <div class="section-head">
+        <span class="section-title">Spectral balance</span>
+        <span class="section-badge" id="spectrum-badge"></span>
+      </div>
+      <div class="spectrum-chart" id="spectrum-chart"></div>
+      <div class="spectrum-legend">
+        <span class="legend-dot dot-target"></span><span>Genre target</span>
+        <span class="legend-dot dot-mix"></span><span>Your mix</span>
+        <span class="legend-dot dot-ref" id="spectrum-legend-ref" style="display:none"></span><span id="spectrum-legend-ref-label" style="display:none">Reference</span>
+      </div>
+    </div>
+
+    <!-- Narrow resonances card (shown only when resonances detected) -->
+    <div class="section-card" id="resonances-card" style="display:none;margin-top:24px"></div>
+
+    <!-- Dynamics chart -->
+    <div class="section-card">
+      <div class="section-head">
+        <span class="section-title">Dynamics &amp; headroom</span>
+      </div>
+      <div class="dynamics-row" id="dynamics-row"></div>
+    </div>
+
+    <!-- Stereo card -->
+    <div class="section-card">
+      <div class="section-head">
+        <span class="section-title">Stereo image</span>
+      </div>
+      <div class="stereo-row" id="stereo-row"></div>
+    </div>
+
+    <!-- Frequency cutoff — upsample / band-limit sanity check. Card is
+         hidden by JS if the analysis result is missing. -->
+    <div class="section-card" id="cutoff-card" style="display:none">
+      <div class="section-head">
+        <span class="section-title">Frequency cutoff</span>
+      </div>
+      <div id="cutoff-body"></div>
+    </div>
+
+    <!-- Warnings list -->
+    <div class="section-card" id="warnings-card">
+      <div class="section-head">
+        <span class="section-title">Issues detected</span>
+      </div>
+      <ul class="warnings-list" id="warnings-list"></ul>
+    </div>
+
+    <!-- Reference comparison (shown only if ref provided) -->
+    <div class="section-card hidden" id="ref-card">
+      <div class="section-head">
+        <span class="section-title">Reference comparison</span>
+      </div>
+      <div id="ref-content"></div>
+    </div>
+
+
+    <!-- Action summary — prioritized fix list, appears after everything else -->
+    <div class="section-card" id="action-summary-card" style="display:none;margin-top:24px"></div>
+
+    <!-- AI Advice Panel -->
+    <div class="section-card" id="ai-card">
+      <div class="section-head">
+        <span class="section-title">AI Engineer advice</span>
+        <span class="section-badge badge-ok" id="ai-badge" style="display:none">Claude</span>
+      </div>
+
+      <!-- API key input (shown when no key in env) -->
+      <div id="ai-key-row" class="ai-key-row">
+        <input type="password" id="api-key-input" placeholder="Paste your Anthropic API key (sk-ant-…)" class="ai-key-input" />
+        <button class="btn-get-advice" id="btn-get-advice">Get advice →</button>
+      </div>
+      <p class="ai-key-hint">Your key is sent only to your local server and never stored.</p>
+
+      <!-- Loading state -->
+      <div id="ai-loading" class="ai-loading hidden">
+        <span class="ai-spinner"></span>
+        <span>Consulting the engineer…</span>
+      </div>
+
+      <!-- Results -->
+      <div id="ai-results" class="hidden">
+        <p class="ai-overall" id="ai-overall"></p>
+
+        <div class="ai-issues" id="ai-issues"></div>
+
+        <div class="ai-positives" id="ai-positives-wrap">
+          <div class="ai-section-label">What's working well</div>
+          <ul class="ai-positives-list" id="ai-positives"></ul>
+        </div>
+
+        <div class="ai-mastering" id="ai-mastering-wrap">
+          <div class="ai-section-label">Mastering note</div>
+          <p class="ai-mastering-text" id="ai-mastering"></p>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <script src="/static/js/anvil-picker.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

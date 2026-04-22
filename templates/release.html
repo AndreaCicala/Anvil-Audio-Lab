@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anvil Audio Lab — Release check</title>
+  <link rel="icon" href="/static/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    /* ---------- Release-check page specifics ----------
+       Uses shared style.css for the base layout / color variables. Only
+       the release-specific UI lives here: platform selector, drop zone,
+       checks list, overall verdict. */
+
+    .rel-platform-row {
+      display: flex; gap: 8px; margin: 20px 0 24px; flex-wrap: wrap;
+    }
+    .rel-platform-pill {
+      flex: 1; min-width: 120px;
+      padding: 14px 18px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); cursor: pointer;
+      font-family: var(--font-head); font-size: 13px; font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--muted);
+      transition: all 0.12s;
+      text-align: center;
+      user-select: none;
+    }
+    .rel-platform-pill:hover {
+      color: var(--text); border-color: var(--border2);
+    }
+    .rel-platform-pill.active {
+      color: var(--accent); border-color: var(--accent);
+      background: rgba(200,240,80,0.04);
+    }
+    .rel-platform-sub {
+      font-family: var(--font-mono); font-size: 10.5px;
+      font-weight: 400; letter-spacing: 0.04em; text-transform: none;
+      color: var(--muted); margin-top: 4px;
+    }
+
+    /* Drop zone — matches master page styling */
+    .rel-drop {
+      border: 1px dashed var(--border2); border-radius: var(--radius-lg);
+      background: var(--bg2); padding: 48px 24px; text-align: center;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .rel-drop.drag-over {
+      border-color: var(--accent); background: rgba(200,240,80,0.04);
+    }
+    .rel-drop-title {
+      font-family: var(--font-head); font-size: 18px; font-weight: 700;
+      color: var(--text); margin-bottom: 8px;
+    }
+    .rel-drop-sub {
+      font-size: 12.5px; color: var(--muted); line-height: 1.65;
+      max-width: 520px; margin: 0 auto;
+    }
+    .rel-drop-strong { color: var(--text); font-weight: 500; }
+
+    /* Analyzing state */
+    .rel-analyzing {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 14px; padding: 60px 20px;
+    }
+    .rel-analyzing-spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: rel-spin 0.8s linear infinite;
+    }
+    @keyframes rel-spin { to { transform: rotate(360deg); } }
+    .rel-analyzing-text {
+      font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+    }
+
+    /* Overall verdict card */
+    .rel-verdict {
+      display: flex; align-items: center; gap: 18px;
+      padding: 18px 22px; margin-bottom: 22px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-left-width: 3px;
+      border-radius: var(--radius);
+    }
+    .rel-verdict.pass { border-left-color: var(--accent); }
+    .rel-verdict.warn { border-left-color: var(--warn); }
+    .rel-verdict.fail { border-left-color: var(--danger); }
+
+    .rel-verdict-icon {
+      flex-shrink: 0;
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-head); font-size: 20px; font-weight: 700;
+    }
+    .rel-verdict.pass .rel-verdict-icon {
+      background: rgba(200,240,80,0.15); color: var(--accent);
+    }
+    .rel-verdict.warn .rel-verdict-icon {
+      background: rgba(245,166,35,0.15); color: var(--warn);
+    }
+    .rel-verdict.fail .rel-verdict-icon {
+      background: rgba(255,95,87,0.15); color: var(--danger);
+    }
+
+    .rel-verdict-body { flex: 1; min-width: 0; }
+    .rel-verdict-title {
+      font-family: var(--font-head); font-size: 15px; font-weight: 700;
+      color: var(--text); letter-spacing: 0.02em;
+    }
+    .rel-verdict-sub {
+      font-family: var(--font-mono); font-size: 12px;
+      color: var(--muted); margin-top: 4px;
+    }
+    .rel-verdict-file {
+      font-family: var(--font-mono); font-size: 11.5px; color: var(--muted);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* Check list */
+    .rel-checks {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .rel-check {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      gap: 14px; align-items: center;
+      padding: 14px 18px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-left-width: 3px;
+      border-radius: var(--radius);
+    }
+    .rel-check.pass { border-left-color: var(--accent); }
+    .rel-check.warn { border-left-color: var(--warn); }
+    .rel-check.fail { border-left-color: var(--danger); }
+    .rel-check.info { border-left-color: var(--accent2); }
+    .rel-check.unknown { border-left-color: var(--border2); }
+
+    .rel-check-icon {
+      font-family: var(--font-head); font-size: 13px; font-weight: 700;
+      text-align: center;
+    }
+    .rel-check.pass .rel-check-icon { color: var(--accent); }
+    .rel-check.warn .rel-check-icon { color: var(--warn); }
+    .rel-check.fail .rel-check-icon { color: var(--danger); }
+    .rel-check.info .rel-check-icon { color: var(--accent2); }
+    .rel-check.unknown .rel-check-icon { color: var(--muted); }
+
+    .rel-check-body { min-width: 0; }
+    .rel-check-label {
+      font-family: var(--font-head); font-size: 12.5px; font-weight: 700;
+      color: var(--text); letter-spacing: 0.03em;
+    }
+    .rel-check-hint {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--muted); margin-top: 4px; line-height: 1.55;
+    }
+
+    .rel-check-value {
+      flex-shrink: 0;
+      font-family: var(--font-mono); font-size: 14px; font-weight: 500;
+      color: var(--text);
+      text-align: right;
+      white-space: nowrap;
+    }
+    .rel-check-value-unit {
+      font-size: 11px; color: var(--muted); margin-left: 2px;
+    }
+
+    /* Action row below results */
+    .rel-actions {
+      display: flex; gap: 10px; margin-top: 24px;
+      flex-wrap: wrap;
+    }
+    .rel-btn {
+      font-family: var(--font-head); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      padding: 10px 18px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 6px; color: var(--text); cursor: pointer;
+      transition: all 0.12s;
+    }
+    .rel-btn:hover {
+      border-color: var(--accent); color: var(--accent);
+    }
+
+    .rel-hidden { display: none !important; }
+
+    /* Info row showing where the tool fits in the workflow */
+    .rel-intro {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 20px;
+      margin-bottom: 20px;
+      font-family: var(--font-mono); font-size: 12px;
+      color: var(--muted); line-height: 1.6;
+    }
+    .rel-intro strong { color: var(--text); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <header style="display:flex;align-items:center;gap:24px;padding:28px 40px 24px;border-bottom:1px solid var(--border)">
+    <div class="logo">
+      <span class="logo-icon">▣</span>
+      <span class="logo-text">ANVIL AUDIO LAB</span>
+    </div>
+    <div class="header-sub">Release check</div>
+    <nav class="nav-group">
+      <a href="/" class="btn-compare">← Mix</a>
+      <a href="/stems" class="btn-compare">◈ Stems</a>
+      <a href="/master" class="btn-compare">◎ Master</a>
+    </nav>
+  </header>
+
+  <!-- Floating quick-access on scroll -->
+  <div class="floating-nav">
+    <a href="/" class="floating-nav-btn" title="Mix analysis">←</a>
+    <a href="/master" class="floating-nav-btn" title="Master">◎</a>
+  </div>
+
+  <main style="max-width:900px;margin:0 auto;padding:28px 40px 60px">
+    <section class="section-card">
+      <h1 style="font-family: var(--font-head); font-size: 22px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 6px;">Release check</h1>
+      <p style="font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin: 0 0 4px;">
+        Upload a finished master (WAV or FLAC) and verify it meets the delivery specs for your target platform.
+      </p>
+
+      <div class="rel-intro">
+        Use this after you've exported your master and want to confirm it's ready to ship.
+        <strong>Accepts WAV or FLAC only</strong> — lossy formats can't be verified for true peak accurately.
+      </div>
+
+      <!-- Platform selector -->
+      <div class="rel-platform-row" role="radiogroup" aria-label="Target platform">
+        <div class="rel-platform-pill active" data-platform="spotify"
+             role="radio" tabindex="0" aria-checked="true">
+          Spotify
+          <div class="rel-platform-sub">−14 LUFS · −1 dBTP</div>
+        </div>
+        <div class="rel-platform-pill" data-platform="youtube"
+             role="radio" tabindex="0" aria-checked="false">
+          YouTube
+          <div class="rel-platform-sub">−14 LUFS · −1 dBTP</div>
+        </div>
+        <div class="rel-platform-pill" data-platform="bandcamp"
+             role="radio" tabindex="0" aria-checked="false">
+          Bandcamp
+          <div class="rel-platform-sub">No normalization</div>
+        </div>
+      </div>
+
+      <!-- Upload drop zone -->
+      <div id="rel-upload-section">
+        <div class="rel-drop" id="rel-drop">
+          <div class="rel-drop-title">Drop your master here</div>
+          <div class="rel-drop-sub">
+            <span class="rel-drop-strong">WAV or FLAC only.</span> This tool verifies your exported master —
+            no processing, no rendering, just the numbers.
+          </div>
+        </div>
+        <input type="file" id="rel-file-input"
+               accept=".wav,.wave,.flac" style="display:none">
+      </div>
+
+      <!-- Analyzing state -->
+      <div id="rel-analyzing-section" class="rel-hidden">
+        <div class="rel-analyzing">
+          <div class="rel-analyzing-spinner"></div>
+          <div class="rel-analyzing-text">Measuring loudness, peak, dynamics…</div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div id="rel-results-section" class="rel-hidden">
+        <!-- Overall verdict -->
+        <div class="rel-verdict" id="rel-verdict">
+          <div class="rel-verdict-icon" id="rel-verdict-icon">—</div>
+          <div class="rel-verdict-body">
+            <div class="rel-verdict-title" id="rel-verdict-title"></div>
+            <div class="rel-verdict-sub" id="rel-verdict-sub"></div>
+          </div>
+          <div class="rel-verdict-file" id="rel-verdict-file"></div>
+        </div>
+
+        <!-- Check list -->
+        <div class="rel-checks" id="rel-checks"></div>
+
+        <!-- Actions -->
+        <div class="rel-actions">
+          <button class="rel-btn" id="rel-btn-new">Check another file</button>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <script src="/static/js/anvil-picker.js"></script>
+  <script src="/static/js/release.js"></script>
+</body>
+</html>

@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anvil Audio Lab — Mastering</title>
+  <link rel="icon" href="/static/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    /* ============================================================
+       MASTERING PAGE — scoped styles
+       ============================================================ */
+
+    /* Drop zone — reuses stems convention */
+    .mst-drop {
+      border: 1px dashed var(--border2); border-radius: var(--radius-lg);
+      background: var(--bg2); padding: 48px 24px; text-align: center;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .mst-drop.drag-over { border-color: var(--accent); background: rgba(200,240,80,0.04); }
+    .mst-drop-icon { font-size: 28px; color: var(--muted); margin-bottom: 10px; }
+    .mst-drop-title { font-family: var(--font-head); font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .mst-drop-sub { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+    /* Source summary strip */
+    .mst-source-strip {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+      margin: 20px 0 28px;
+    }
+    .mst-chip {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 14px;
+    }
+    .mst-chip-label {
+      font-family: var(--font-mono); font-size: 10px;
+      color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .mst-chip-value {
+      font-family: var(--font-mono); font-size: 18px;
+      color: var(--text); margin-top: 4px; font-weight: 500;
+    }
+    .mst-chip-unit { font-size: 11px; color: var(--muted); margin-left: 3px; }
+
+    /* Preflight warnings */
+    .mst-warning {
+      background: rgba(255,95,87,0.08);
+      border: 1px solid rgba(255,95,87,0.25);
+      border-left: 3px solid var(--danger);
+      border-radius: var(--radius); padding: 12px 16px;
+      margin-bottom: 12px; font-size: 13px; color: var(--text);
+      line-height: 1.5;
+    }
+    .mst-warning-icon { color: var(--danger); margin-right: 6px; font-weight: 700; }
+
+    /* Suggestion cards */
+    .mst-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 14px;
+      overflow: hidden; transition: border-color 0.15s;
+    }
+    .mst-card.accepted { border-color: rgba(200,240,80,0.35); }
+    .mst-card-header {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .mst-card.accepted .mst-card-header { background: rgba(200,240,80,0.03); }
+    .mst-card-toggle {
+      appearance: none;
+      width: 18px; height: 18px; border-radius: 4px;
+      border: 1.5px solid var(--border2); background: var(--bg3);
+      cursor: pointer; position: relative;
+      flex-shrink: 0;
+    }
+    .mst-card-toggle:checked {
+      background: var(--accent); border-color: var(--accent);
+    }
+    .mst-card-toggle:checked::after {
+      content: "✓"; position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--bg); font-size: 13px; font-weight: 700;
+    }
+    .mst-card-num {
+      font-family: var(--font-mono); color: var(--muted); font-size: 13px;
+      min-width: 16px;
+    }
+    .mst-card-title {
+      font-family: var(--font-head); font-weight: 700;
+      font-size: 15px; color: var(--text);
+      letter-spacing: 0.02em; flex: 1;
+    }
+    .mst-card-delta {
+      font-family: var(--font-mono); font-size: 13px; color: var(--accent);
+      font-weight: 500;
+    }
+    .mst-card-body { padding: 14px 18px; }
+    .mst-card-rationale {
+      color: var(--muted); font-size: 12.5px; line-height: 1.6;
+      margin-bottom: 12px;
+    }
+    .mst-card-numbers {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px; margin-bottom: 10px;
+    }
+    .mst-num-box {
+      background: var(--bg3); border-radius: 6px; padding: 8px 10px;
+      font-family: var(--font-mono); font-size: 11px;
+    }
+    .mst-num-label { color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
+    .mst-num-value { color: var(--text); font-size: 14px; margin-top: 2px; font-weight: 500; }
+
+    /* Slider row for adjustable numeric values */
+    .mst-slider-row {
+      display: flex; align-items: center; gap: 12px;
+      padding-top: 10px; border-top: 1px solid var(--border);
+      margin-top: 8px;
+    }
+    .mst-slider-row label {
+      font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      min-width: 70px;
+    }
+    .mst-slider-row input[type="range"] {
+      flex: 1; accent-color: var(--accent);
+    }
+    .mst-slider-row input[type="number"] {
+      width: 70px; background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 4px; padding: 4px 8px; font-family: var(--font-mono);
+      font-size: 12px; color: var(--text); text-align: right; outline: none;
+    }
+    .mst-slider-row input[type="number"]:focus { border-color: var(--accent); }
+
+    /* Hide native number-input spinner buttons across browsers.
+       Chrome's default spinner is visually heavy and its position
+       conflicts with right-aligned monospace values. Use the keyboard
+       arrows or just type. */
+    .mst-slider-row input[type="number"]::-webkit-inner-spin-button,
+    .mst-slider-row input[type="number"]::-webkit-outer-spin-button,
+    .mst-bell input[type="number"]::-webkit-inner-spin-button,
+    .mst-bell input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none; margin: 0;
+    }
+    .mst-slider-row input[type="number"],
+    .mst-bell input[type="number"] { -moz-appearance: textfield; }
+
+    /* Action bar */
+    .mst-actions {
+      display: flex; gap: 12px; margin-top: 24px;
+      padding-top: 20px; border-top: 1px solid var(--border);
+    }
+    .mst-btn {
+      font-family: var(--font-head); font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 12px 22px; border-radius: var(--radius);
+      font-size: 13px; border: none; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .mst-btn-primary {
+      background: var(--accent); color: var(--bg);
+    }
+    .mst-btn-primary:hover { filter: brightness(1.08); }
+    .mst-btn-secondary {
+      background: transparent; color: var(--text); border: 1px solid var(--border2);
+    }
+    .mst-btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .mst-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* A/B playback */
+    .mst-ab {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 18px; margin: 18px 0;
+    }
+    .mst-ab-title {
+      font-family: var(--font-head); font-weight: 700; font-size: 14px;
+      color: var(--text); text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: 12px;
+    }
+    .mst-ab-row {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 10px;
+    }
+    .mst-ab-row:last-child { margin-bottom: 0; }
+    .mst-ab-label {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--muted); min-width: 80px; text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .mst-ab-row.active .mst-ab-label { color: var(--accent); }
+    .mst-ab audio { flex: 1; height: 32px; }
+
+    /* Post-master verification */
+    .mst-verify {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+      margin-top: 12px;
+    }
+    .mst-verify-box {
+      background: var(--bg3); border-radius: var(--radius);
+      padding: 12px 14px; border-left: 3px solid var(--border2);
+    }
+    .mst-verify-box.pass { border-left-color: var(--ok); }
+    .mst-verify-box.fail { border-left-color: var(--danger); }
+    .mst-verify-box.note { border-left-color: var(--accent2); }
+    .mst-verify-label {
+      font-family: var(--font-mono); font-size: 10px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .mst-verify-value {
+      font-family: var(--font-mono); font-size: 16px; color: var(--text);
+      margin-top: 4px;
+    }
+    .mst-verify-target { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+    .mst-section-head {
+      font-family: var(--font-head); font-size: 14px; font-weight: 700;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em;
+      margin: 28px 0 14px;
+    }
+
+    .mst-muted { color: var(--muted); font-size: 12px; }
+    .mst-hidden { display: none !important; }
+
+    /* ---- EQ card layout (shared by 6-band EQ; classes prefixed mst-ref
+         are historical — the code originally used them for Reference Match,
+         which has been removed, but the 6-band EQ section still uses the
+         same layout scaffolding.) ---- */
+    .mst-ref-panel {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px;
+    }
+    .mst-ref-header {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+      padding-bottom: 12px; border-bottom: 1px solid var(--border);
+    }
+
+    /* Correction-ratio slider */
+    .mst-ref-corr {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 12px; background: var(--bg3); border-radius: 6px;
+      margin-bottom: 14px;
+    }
+    .mst-ref-corr label {
+      font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em; min-width: 140px;
+    }
+    .mst-ref-corr input[type="range"] { flex: 1; accent-color: var(--accent); }
+    .mst-ref-corr-val {
+      font-family: var(--font-mono); font-size: 12px; color: var(--accent);
+      font-weight: 500; min-width: 45px; text-align: right;
+    }
+
+    /* EQ curve SVG container */
+    .mst-eq-curve {
+      background: var(--bg3); border-radius: 6px;
+      padding: 12px; margin-bottom: 14px;
+      position: relative; overflow: hidden;
+    }
+    .mst-eq-curve-title {
+      font-family: var(--font-mono); font-size: 10px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;
+    }
+    .mst-eq-curve svg { width: 100%; height: 120px; display: block; }
+
+    /* Bell list */
+    .mst-bells { display: flex; flex-direction: column; gap: 8px; }
+    .mst-bell {
+      display: grid;
+      grid-template-columns: 22px 90px 1fr 60px 60px;
+      gap: 10px; align-items: center;
+      padding: 10px 12px;
+      background: var(--bg3); border-radius: 6px;
+      border: 1px solid transparent;
+      transition: border-color 0.12s;
+    }
+    .mst-bell.accepted { border-color: rgba(200,240,80,0.3); }
+    .mst-bell-toggle {
+      appearance: none; width: 16px; height: 16px; border-radius: 3px;
+      border: 1.5px solid var(--border2); background: var(--bg2);
+      cursor: pointer; position: relative;
+    }
+    .mst-bell-toggle:checked { background: var(--accent); border-color: var(--accent); }
+    .mst-bell-toggle:checked::after {
+      content: "✓"; position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--bg); font-size: 11px; font-weight: 700;
+    }
+    .mst-bell-label {
+      font-family: var(--font-mono); font-size: 12px; color: var(--text);
+    }
+    .mst-bell-label small { color: var(--muted); font-size: 10px; }
+    .mst-bell-rationale {
+      font-family: var(--font-mono); font-size: 10.5px;
+      color: var(--muted); line-height: 1.5;
+    }
+    .mst-bell-gain {
+      font-family: var(--font-mono); font-size: 12px;
+      text-align: right; font-weight: 500;
+    }
+    .mst-bell-gain.neg { color: var(--accent2); }
+    .mst-bell-gain.pos { color: var(--accent); }
+    .mst-bell-gain.zero { color: var(--muted); }
+    .mst-bell input[type="number"] {
+      width: 56px; background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: 4px; padding: 4px 6px; font-family: var(--font-mono);
+      font-size: 11px; color: var(--text); text-align: right; outline: none;
+    }
+    .mst-bell input[type="number"]:focus { border-color: var(--accent); }
+
+    /* Side-by-side vs-pink comparison strip */
+    .mst-ref-compare {
+      display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
+      margin-bottom: 14px;
+    }
+    .mst-cmp-cell {
+      background: var(--bg3); border-radius: 6px; padding: 8px 6px;
+      text-align: center; font-family: var(--font-mono);
+    }
+    .mst-cmp-band { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .mst-cmp-row {
+      display: flex; justify-content: space-between; font-size: 10px; margin-top: 4px;
+    }
+    .mst-cmp-row .lbl { color: var(--muted); }
+    .mst-cmp-row .val { color: var(--text); }
+    .mst-cmp-delta {
+      font-size: 11px; font-weight: 500; margin-top: 4px;
+      padding: 2px 4px; border-radius: 3px; display: inline-block;
+    }
+    .mst-cmp-delta.small { color: var(--muted); background: transparent; }
+    .mst-cmp-delta.bright { color: var(--danger); background: rgba(255,95,87,0.12); }
+    .mst-cmp-delta.dark { color: var(--accent2); background: rgba(123,97,255,0.12); }
+
+    @media (max-width: 700px) {
+      .mst-ref-compare { grid-template-columns: repeat(3, 1fr); }
+      .mst-bell { grid-template-columns: 22px 1fr 70px; }
+      .mst-bell-rationale { display: none; }
+    }
+
+    /* Mode pill for 6-band EQ (Suggested / Manual) */
+    .mst-eq-mode-pill {
+      display: inline-flex; gap: 0;
+      background: var(--bg3); border-radius: 6px;
+      padding: 2px; border: 1px solid var(--border);
+    }
+    .mst-eq-mode-btn {
+      background: transparent; border: none; padding: 4px 12px;
+      font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+      text-transform: none; letter-spacing: 0;
+      border-radius: 4px; cursor: pointer; transition: all 0.12s;
+    }
+    .mst-eq-mode-btn:hover { color: var(--text); }
+    .mst-eq-mode-btn.active {
+      background: var(--bg2); color: var(--text);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+
+    /* ---- Mono-bass check card ---- */
+    .mst-msbass, .mst-msair, .mst-cutoff {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 18px;
+    }
+    /* Severity-driven left border, same pattern as post-master verify cards */
+    .mst-msbass.clean,  .mst-msair.clean,  .mst-cutoff.clean   { border-left: 3px solid var(--accent); }
+    .mst-msbass.mild,   .mst-msair.mild,   .mst-cutoff.mild    { border-left: 3px solid var(--warn); }
+    .mst-msbass.worth,  .mst-msair.worth,  .mst-cutoff.worth   { border-left: 3px solid var(--warn); }
+    .mst-msbass.severe, .mst-msair.severe, .mst-cutoff.severe  { border-left: 3px solid var(--danger); }
+    .mst-msbass-row {
+      display: flex; align-items: center; gap: 14px;
+    }
+    .mst-msbass-stats {
+      flex: 1; font-family: var(--font-mono); font-size: 12px;
+      line-height: 1.5; color: var(--text);
+    }
+    .mst-msbass-stats .hdr {
+      font-family: var(--font-head); font-size: 13px; letter-spacing: 0.04em;
+      font-weight: 700; display: block; margin-bottom: 4px;
+    }
+    .mst-msbass-stats .hdr.clean  { color: var(--accent); }
+    .mst-msbass-stats .hdr.mild   { color: var(--warn); }
+    .mst-msbass-stats .hdr.worth  { color: var(--warn); }
+    .mst-msbass-stats .hdr.severe { color: var(--danger); }
+    .mst-msbass-stats .sub { color: var(--muted); font-size: 11.5px; }
+    .mst-msbass-action {
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    }
+    .mst-msbass-btn {
+      font-family: var(--font-head); font-size: 11px; font-weight: 700;
+      letter-spacing: 0.06em; padding: 8px 14px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 6px; color: var(--text); cursor: pointer;
+      transition: all 0.12s;
+    }
+    .mst-msbass-btn:hover {
+      border-color: var(--accent); color: var(--accent);
+    }
+    .mst-msbass-btn.applied {
+      background: rgba(200,240,80,0.12); border-color: var(--accent);
+      color: var(--accent);
+    }
+    .mst-msbass-btn:disabled {
+      opacity: 0.5; cursor: not-allowed;
+    }
+
+    /* Drop zone */
+    .mst-ref-drop {
+      border: 1px dashed var(--border2); border-radius: var(--radius);
+      padding: 24px; text-align: center; cursor: pointer;
+      transition: all 0.12s;
+    }
+    .mst-ref-drop:hover, .mst-ref-drop.drag-over {
+      border-color: var(--accent); background: rgba(200,240,80,0.03);
+    }
+    .mst-ref-drop-title {
+      font-family: var(--font-head); font-size: 13px; font-weight: 700;
+      letter-spacing: 0.04em; color: var(--text); margin-bottom: 6px;
+    }
+    .mst-ref-drop-sub {
+      font-size: 11.5px; color: var(--muted); line-height: 1.55;
+      max-width: 540px; margin: 0 auto;
+    }
+
+    /* Loaded state */
+    .mst-ref-loaded-row {
+      display: flex; align-items: center; gap: 12px;
+      padding-bottom: 12px; margin-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .mst-ref-loaded-info { flex: 1; min-width: 0; }
+    .mst-ref-filename {
+      font-family: var(--font-mono); font-size: 12.5px;
+      color: var(--text); font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .mst-ref-lufs {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--muted); margin-top: 2px;
+    }
+    .mst-ref-remove {
+      width: 28px; height: 28px; flex-shrink: 0;
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 4px; color: var(--muted);
+      font-size: 18px; line-height: 1; cursor: pointer;
+      transition: all 0.12s;
+    }
+    .mst-ref-remove:hover {
+      border-color: var(--danger); color: var(--danger);
+    }
+
+    /* Correction strength slider block */
+    .mst-ref-corr-wrap {
+      margin-bottom: 14px;
+    }
+    .mst-ref-corr-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .mst-ref-corr-label {
+      font-family: var(--font-head); font-size: 11px; font-weight: 700;
+      letter-spacing: 0.06em; color: var(--text);
+    }
+    .mst-ref-corr-val {
+      font-family: var(--font-mono); font-size: 12px; color: var(--accent);
+    }
+    .mst-ref-corr-sub {
+      font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.5;
+    }
+
+    /* Apply-in-chain toggle row */
+    .mst-ref-enabled-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px; margin-bottom: 14px;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 6px; cursor: pointer;
+      font-family: var(--font-mono); font-size: 12px; color: var(--text);
+    }
+    .mst-ref-enabled-row:hover { border-color: var(--accent); }
+    .mst-ref-enabled-row input { margin: 0; cursor: pointer; }
+
+    /* Analyzing state */
+    .mst-ref-analyzing {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 10px; padding: 30px;
+      font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+    }
+    .mst-ref-analyzing-spinner {
+      width: 28px; height: 28px; border: 2px solid var(--border2);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: mst-spin 0.8s linear infinite;
+    }
+    @keyframes mst-spin { to { transform: rotate(360deg); } }
+
+    /* ---- Metadata tagging (collapsible) ----
+       Same visual pattern as Reference Match: subtle border, de-emphasized
+       collapsed title that promotes itself when expanded. Sits inside the
+       preview-wrap above the Export section. */
+    .mst-meta {
+      background: transparent; border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+      margin: 16px 0 20px;
+    }
+    .mst-meta-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; cursor: pointer;
+      background: var(--bg2); transition: background 0.12s;
+      user-select: none;
+    }
+    .mst-meta-header:hover { background: var(--bg3); }
+    .mst-meta-header:focus-visible {
+      outline: 1px solid var(--accent); outline-offset: -1px;
+    }
+    .mst-meta-chevron {
+      font-family: var(--font-mono); font-size: 14px;
+      color: var(--muted); transition: transform 0.15s;
+      display: inline-block; width: 14px;
+    }
+    .mst-meta.expanded .mst-meta-chevron { transform: rotate(90deg); }
+    .mst-meta-title {
+      font-family: var(--font-head); font-size: 12px; font-weight: 500;
+      letter-spacing: 0.08em; color: var(--muted);
+      text-transform: uppercase;
+      transition: color 0.12s, font-weight 0.12s;
+    }
+    .mst-meta.expanded .mst-meta-title {
+      color: var(--text); font-weight: 700;
+    }
+    .mst-meta-header:hover .mst-meta-title { color: var(--text); }
+    .mst-meta-hint {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--muted); margin-left: auto;
+    }
+    .mst-meta-body {
+      padding: 16px 18px;
+      border-top: 1px solid var(--border);
+      background: var(--bg2);
+    }
+
+    /* 6-field grid: 3 columns on wide, collapses on mobile.
+       Title spans 2 columns (wide); Track # and Year are narrow. */
+    .mst-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px 16px;
+    }
+    .mst-meta-field {
+      display: flex; flex-direction: column; gap: 5px;
+      min-width: 0;  /* so the inputs can shrink instead of overflowing */
+    }
+    .mst-meta-field-wide  { grid-column: span 2; }
+    .mst-meta-field-small { /* Track # + Year inherit 1-col width */ }
+    .mst-meta-lbl {
+      font-family: var(--font-mono); font-size: 10.5px;
+      color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .mst-meta-field input[type="text"],
+    .mst-meta-field input[type="number"] {
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 4px; padding: 7px 10px;
+      font-family: var(--font-mono); font-size: 12.5px;
+      color: var(--text); outline: none;
+      transition: border-color 0.12s;
+      min-width: 0; width: 100%;
+    }
+    .mst-meta-field input:focus {
+      border-color: var(--accent);
+    }
+    /* Hide number spinners (matches convention elsewhere in this app).
+       Wheel-scroll nudge is wired up in JS instead. */
+    .mst-meta-field input[type="number"]::-webkit-inner-spin-button,
+    .mst-meta-field input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none; margin: 0;
+    }
+    .mst-meta-field input[type="number"] { appearance: textfield; }
+
+    .mst-meta-footer {
+      display: flex; align-items: flex-start; gap: 12px;
+      margin-top: 14px; padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .mst-meta-footer-hint {
+      flex: 1;
+      font-family: var(--font-mono); font-size: 10.5px;
+      color: var(--muted); line-height: 1.55;
+    }
+    .mst-meta-clear {
+      flex-shrink: 0;
+      font-family: var(--font-head); font-size: 10.5px;
+      font-weight: 700; letter-spacing: 0.06em;
+      padding: 6px 12px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 4px; color: var(--muted);
+      cursor: pointer; transition: all 0.12s;
+    }
+    .mst-meta-clear:hover {
+      color: var(--danger); border-color: var(--danger);
+    }
+
+    @media (max-width: 640px) {
+      .mst-meta-grid { grid-template-columns: 1fr 1fr; }
+      .mst-meta-field-wide { grid-column: span 2; }
+    }
+
+    /* ---- Tonal Mode toggle ---- */
+    .mst-mode-switch {
+      display: flex; align-items: center; gap: 14px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 16px;
+      margin: 0 0 20px;
+    }
+    .mst-mode-switch-label {
+      flex: 1;
+    }
+    .mst-mode-switch-title {
+      font-family: var(--font-head); font-size: 13px; font-weight: 700;
+      color: var(--text); letter-spacing: 0.04em;
+    }
+    .mst-mode-switch-sub {
+      font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.5;
+    }
+    .mst-toggle-switch {
+      position: relative; width: 44px; height: 24px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 12px; cursor: pointer; flex-shrink: 0;
+      transition: all 0.18s;
+    }
+    .mst-toggle-switch::after {
+      content: ""; position: absolute; top: 2px; left: 2px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--muted); transition: all 0.18s;
+    }
+    .mst-toggle-switch.on {
+      background: rgba(200,240,80,0.15); border-color: var(--accent);
+    }
+    .mst-toggle-switch.on::after {
+      left: 22px; background: var(--accent);
+    }
+    .mst-toggle-switch input { position: absolute; opacity: 0; pointer-events: none; }
+
+    /* ---- Source verdict card ---- */
+    .mst-verdict {
+      border-radius: var(--radius); padding: 14px 18px; margin-bottom: 18px;
+      border-left: 3px solid var(--border2);
+      background: var(--bg2); border: 1px solid var(--border);
+    }
+    .mst-verdict.sev-warn  { border-left-color: var(--danger);
+                              background: rgba(255,95,87,0.06);
+                              border-color: rgba(255,95,87,0.25); }
+    .mst-verdict.sev-info  { border-left-color: var(--warn);
+                              background: rgba(245,166,35,0.05);
+                              border-color: rgba(245,166,35,0.22); }
+    .mst-verdict.sev-ok    { border-left-color: var(--ok);
+                              background: rgba(48,209,88,0.05);
+                              border-color: rgba(48,209,88,0.22); }
+    .mst-verdict.sev-note  { border-left-color: var(--accent2);
+                              background: rgba(123,97,255,0.05);
+                              border-color: rgba(123,97,255,0.22); }
+    .mst-verdict-title {
+      font-family: var(--font-head); font-weight: 700; font-size: 14px;
+      color: var(--text); letter-spacing: 0.03em;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .mst-verdict-icon { font-family: var(--font-mono); font-size: 13px; }
+    .mst-verdict.sev-warn  .mst-verdict-icon { color: var(--danger); }
+    .mst-verdict.sev-info  .mst-verdict-icon { color: var(--warn); }
+    .mst-verdict.sev-ok    .mst-verdict-icon { color: var(--ok); }
+    .mst-verdict.sev-note  .mst-verdict-icon { color: var(--accent2); }
+    .mst-verdict-body {
+      color: var(--text); font-size: 12.5px; line-height: 1.6;
+      margin-top: 8px;
+    }
+    .mst-verdict-heuristic {
+      color: var(--muted); font-size: 11.5px; line-height: 1.55;
+      margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
+      font-style: italic;
+    }
+    .mst-verdict-cta {
+      margin-top: 10px;
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--accent); cursor: pointer; user-select: none;
+      padding: 4px 10px; border-radius: 4px;
+      background: rgba(200,240,80,0.08);
+      border: 1px solid rgba(200,240,80,0.25);
+    }
+    .mst-verdict-cta:hover { background: rgba(200,240,80,0.14); }
+
+    /* Loading */
+    .mst-loading {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid var(--border2); border-top-color: var(--accent);
+      border-radius: 50%; animation: mst-spin 0.8s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes mst-spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 700px) {
+      .mst-source-strip { grid-template-columns: repeat(2, 1fr); }
+      .mst-verify { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header style="display:flex;align-items:center;gap:24px;padding:28px 40px 24px;border-bottom:1px solid var(--border)">
+    <div class="logo">
+      <span class="logo-icon">▣</span>
+      <span class="logo-text">ANVIL AUDIO LAB</span>
+    </div>
+    <div class="header-sub">Mastering</div>
+    <nav class="nav-group">
+      <a href="/" class="btn-compare">← Mix</a>
+      <a href="/stems" class="btn-compare">◈ Stems</a>
+      <a href="/release" class="btn-compare">✓ Release check</a>
+      <button class="btn-compare" id="btn-master-history" onclick="toggleMasterHistory()">⏱ History</button>
+    </nav>
+  </header>
+
+  <!-- Floating quick-access -->
+  <div class="floating-nav">
+    <a href="/" class="floating-nav-btn" title="Mix">←</a>
+    <a href="/release" class="floating-nav-btn" title="Release check">✓</a>
+    <button class="floating-nav-btn" onclick="toggleMasterHistory()" title="Master history">⏱</button>
+  </div>
+
+  <!-- Master history panel -->
+  <div id="master-history-panel" style="display:none;position:fixed;top:0;right:0;width:340px;height:100vh;background:var(--bg2);border-left:1px solid var(--border);z-index:1000;overflow-y:auto;padding:24px 20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <span style="font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted)">Recent masters</span>
+      <button onclick="toggleMasterHistory()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <div id="master-history-list">
+      <div style="font-size:13px;color:var(--muted);text-align:center;padding:40px 0">Loading...</div>
+    </div>
+  </div>
+  <div id="master-history-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999" onclick="toggleMasterHistory()"></div>
+
+  <main style="max-width:900px;margin:0 auto;padding:32px 40px 60px">
+
+    <!-- Intro blurb -->
+    <div style="margin-bottom:20px">
+      <h1 style="font-family:var(--font-head);font-size:28px;font-weight:800;margin:0 0 8px">Mastering</h1>
+      <p class="mst-muted" style="line-height:1.6;margin:0">
+        Drop a stereo mix bounce. I'll analyze it, propose the minimum set of
+        mastering moves needed to hit streaming targets (&minus;14 LUFS,
+        &minus;1 dBFS true peak), and let you approve each step before export.
+      </p>
+    </div>
+
+    <!-- Tonal Mode toggle -->
+    <div class="mst-mode-switch">
+      <div class="mst-mode-switch-label">
+        <div class="mst-mode-switch-title">Tonal Mode</div>
+        <div class="mst-mode-switch-sub">
+          Preserve upstream loudness and focus on tonal/dynamic shaping.
+          Best when your mix already has bus limiting you want to keep.
+        </div>
+      </div>
+      <div class="mst-toggle-switch" id="mst-mode-toggle" role="switch" aria-checked="false" tabindex="0"></div>
+    </div>
+
+    <!-- Stage 1: Upload -->
+    <section id="mst-upload-section">
+      <div class="mst-drop" id="mst-drop">
+        <div class="mst-drop-icon">◈</div>
+        <div class="mst-drop-title">Drop your stereo mix bounce here</div>
+        <div class="mst-drop-sub">
+          WAV, AIFF, or FLAC &nbsp;·&nbsp; 16/24/32-bit &nbsp;·&nbsp; mono or stereo<br>
+          For best results, bounce at <span style="color:var(--text)">&minus;18 to &minus;14 LUFS</span>
+          with no master-bus limiting.
+        </div>
+      </div>
+      <input type="file" id="mst-file-input" accept=".wav,.aiff,.aif,.flac" style="display:none">
+    </section>
+
+    <!-- Stage 2: Analysis in progress -->
+    <section id="mst-analyzing-section" class="mst-hidden" style="text-align:center;padding:40px 0">
+      <div class="mst-loading" style="width:28px;height:28px;border-width:3px"></div>
+      <div style="margin-top:16px;font-family:var(--font-mono);color:var(--muted);font-size:13px">
+        Analyzing mix &amp; building mastering proposal...
+      </div>
+    </section>
+
+    <!-- Stage 3: Proposal + chain -->
+    <section id="mst-proposal-section" class="mst-hidden">
+
+      <!-- Source summary -->
+      <div class="mst-section-head">Source</div>
+      <div id="mst-source-filename" class="mst-muted" style="margin-bottom:10px"></div>
+      <div class="mst-source-strip" id="mst-source-strip"></div>
+
+      <!-- Source verdict card (populated from source_verdict) -->
+      <div id="mst-verdict"></div>
+
+      <!-- Preflight warnings (for truly urgent issues like clipping) -->
+      <div id="mst-warnings"></div>
+
+      <!-- Suggestion cards -->
+      <div class="mst-section-head">Proposed chain</div>
+      <div id="mst-cards"></div>
+
+      <!-- 6-band EQ and Reference Match moved below M/S checks into a
+           unified "Tonal correction" section — see below. -->
+
+      <!-- Mono-bass check (populated by JS after /analyze-master) -->
+      <div class="mst-section-head">Mono-bass check</div>
+      <div class="mst-msbass" id="mst-msbass">
+        <div class="mst-msbass-body" id="mst-msbass-body">
+          <!-- severity badge + message + apply button injected here -->
+        </div>
+      </div>
+
+      <!-- Sides-air check (populated by JS after /analyze-master) -->
+      <div class="mst-section-head">Sides-air check</div>
+      <div class="mst-msair" id="mst-msair">
+        <div class="mst-msbass-body" id="mst-msair-body">
+          <!-- mirrors the mono-bass card — same row/stats/action layout -->
+        </div>
+      </div>
+
+      <!-- Frequency cutoff check (populated by JS after /analyze-master).
+           Informational only — no fix action, since this is about the source
+           material, not something mastering can correct. -->
+      <div class="mst-section-head">Frequency cutoff</div>
+      <div class="mst-cutoff" id="mst-cutoff">
+        <div class="mst-msbass-body" id="mst-cutoff-body">
+          <!-- populated by renderCutoffCheck in master.js -->
+        </div>
+      </div>
+
+      <!--
+        Tonal correction — unified section for 6-band EQ and Reference Match.
+        The segmented control at the top chooses the active source; only one
+        tonal correction runs in the chain at a time (mutually exclusive).
+        Switching the toggle preserves state in both panels so users can
+        flip between them without losing their settings.
+      -->
+      <div class="mst-section-head" style="display:flex;align-items:center;gap:12px">
+        <span>Tonal correction</span>
+        <div class="mst-eq-mode-pill" id="mst-tonal-mode" role="tablist"
+             aria-label="Tonal correction source">
+          <button class="mst-eq-mode-btn active" data-tonal="eq"
+                  role="tab" aria-selected="true" aria-controls="mst-geq-panel">
+            Suggested EQ
+          </button>
+          <button class="mst-eq-mode-btn" data-tonal="refmatch"
+                  role="tab" aria-selected="false" aria-controls="mst-refmatch-panel">
+            Reference Match
+          </button>
+        </div>
+      </div>
+
+      <!-- 6-band EQ panel (shown when tonal source = "eq") -->
+      <div class="mst-ref-panel" id="mst-geq-panel">
+        <!-- Header: brief description + enable toggle -->
+        <div class="mst-ref-header" style="border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:14px">
+          <span id="mst-geq-desc" style="flex:1;font-family:var(--font-mono);font-size:12px;color:var(--muted);line-height:1.5"></span>
+          <label class="mst-format-chip" style="margin:0">
+            <input type="checkbox" id="mst-geq-enabled">
+            <span style="font-size:11px">Apply in chain</span>
+          </label>
+        </div>
+
+        <!-- Correction slider -->
+        <div class="mst-ref-corr" id="mst-geq-corr-wrap">
+          <label>Correction strength</label>
+          <input type="range" id="mst-geq-corr-slider" min="0" max="100" value="50" step="5">
+          <span class="mst-ref-corr-val" id="mst-geq-corr-val">50%</span>
+        </div>
+
+        <!-- Mix vs Target strip -->
+        <div class="mst-ref-compare" id="mst-geq-compare"></div>
+
+        <!-- EQ curve visualization -->
+        <div class="mst-eq-curve">
+          <div class="mst-eq-curve-title">Total EQ response</div>
+          <div id="mst-geq-curve-svg"></div>
+        </div>
+
+        <!-- Bell list -->
+        <div class="mst-bells" id="mst-geq-bells"></div>
+      </div>
+
+      <!--
+        Reference Match panel (shown when tonal source = "refmatch")
+        Was previously collapsible; now its visibility is controlled by the
+        parent segmented toggle, so the chevron/header pattern is gone.
+      -->
+      <div class="mst-ref-panel mst-hidden" id="mst-refmatch-panel">
+
+        <!-- Step 1: drop zone (visible before a ref is loaded) -->
+        <div class="mst-ref-drop" id="mst-ref-drop">
+          <div class="mst-ref-drop-title">Drop a reference track</div>
+          <div class="mst-ref-drop-sub">
+            WAV, AIFF, or FLAC — a professionally mastered track in a similar
+            style. Anvil will measure its spectral profile and suggest up to
+            6 EQ bells that nudge your mix toward it.
+          </div>
+          <input type="file" id="mst-ref-file-input"
+                 accept=".wav,.aiff,.aif,.flac" style="display:none">
+        </div>
+
+        <!-- Step 2: ref loaded state (hidden until file dropped) -->
+        <div class="mst-ref-loaded mst-hidden" id="mst-ref-loaded">
+          <div class="mst-ref-loaded-row">
+            <div class="mst-ref-loaded-info">
+              <div class="mst-ref-filename" id="mst-ref-filename"></div>
+              <div class="mst-ref-lufs" id="mst-ref-lufs"></div>
+            </div>
+            <button class="mst-ref-remove" id="mst-ref-remove"
+                    title="Remove this reference">×</button>
+          </div>
+
+          <!-- Correction strength slider -->
+          <div class="mst-ref-corr-wrap">
+            <div class="mst-ref-corr-head">
+              <span class="mst-ref-corr-label">Correction strength</span>
+              <span class="mst-ref-corr-val" id="mst-ref-corr-val">50%</span>
+            </div>
+            <input type="range" class="mst-slider"
+                   id="mst-ref-corr-slider"
+                   min="0" max="100" step="5" value="50">
+            <div class="mst-ref-corr-sub">
+              0% = do nothing · 100% = full match. Values around 40-60%
+              usually sound best — enough to move the needle without losing
+              your mix's character.
+            </div>
+          </div>
+
+          <!-- Enable / apply-in-chain toggle -->
+          <label class="mst-ref-enabled-row">
+            <input type="checkbox" id="mst-ref-enabled">
+            <span>Apply in chain</span>
+          </label>
+
+          <!-- EQ curve visualization -->
+          <div class="mst-eq-curve-wrap" id="mst-ref-curve-wrap">
+            <svg class="mst-eq-curve-svg" id="mst-ref-curve-svg"
+                 viewBox="0 0 600 140" preserveAspectRatio="none"></svg>
+          </div>
+
+          <!-- vs-reference comparison strip -->
+          <div class="mst-ref-compare" id="mst-ref-compare"></div>
+
+          <!-- Bells -->
+          <div class="mst-bells" id="mst-ref-bells"></div>
+        </div>
+
+        <!-- Analyzing state -->
+        <div class="mst-ref-analyzing mst-hidden" id="mst-ref-analyzing">
+          <div class="mst-ref-analyzing-spinner"></div>
+          <div>Analyzing reference…</div>
+        </div>
+      </div>
+
+      <!-- Action bar -->
+      <div class="mst-actions">
+        <button class="mst-btn mst-btn-primary" id="mst-btn-preview">Render preview</button>
+        <button class="mst-btn mst-btn-secondary" id="mst-btn-reset">Reset chain</button>
+        <button class="mst-btn mst-btn-secondary" id="mst-btn-new" style="margin-left:auto">New source</button>
+      </div>
+
+      <!-- A/B playback + post-master verification -->
+      <div id="mst-preview-wrap" class="mst-hidden">
+
+        <div class="mst-section-head">A / B</div>
+        <div class="mst-ab">
+          <div class="mst-ab-row" id="mst-ab-source-row">
+            <div class="mst-ab-label">Source</div>
+            <audio id="mst-audio-source" controls preload="none"></audio>
+          </div>
+          <div class="mst-ab-row" id="mst-ab-master-row">
+            <div class="mst-ab-label">Mastered</div>
+            <audio id="mst-audio-master" controls preload="none"></audio>
+          </div>
+        </div>
+
+        <div class="mst-section-head">Post-master verification</div>
+        <div class="mst-verify" id="mst-verify"></div>
+
+        <!-- Metadata tagging — collapsible, closed by default.
+             Fields get written to the exported file (ID3v2 on WAV + MP3). -->
+        <div class="mst-meta" id="mst-meta">
+          <div class="mst-meta-header" id="mst-meta-header"
+               role="button" tabindex="0" aria-expanded="false"
+               aria-controls="mst-meta-body">
+            <span class="mst-meta-chevron" aria-hidden="true">▸</span>
+            <span class="mst-meta-title">Metadata</span>
+            <span class="mst-meta-hint" id="mst-meta-hint">
+              Optional — tag the exported file with Title, Artist, Album, etc.
+            </span>
+          </div>
+          <div class="mst-meta-body mst-hidden" id="mst-meta-body">
+            <div class="mst-meta-grid">
+              <label class="mst-meta-field mst-meta-field-wide">
+                <span class="mst-meta-lbl">Title</span>
+                <input type="text" id="mst-meta-title" maxlength="200"
+                       placeholder="Song title" autocomplete="off">
+              </label>
+              <label class="mst-meta-field">
+                <span class="mst-meta-lbl">Artist</span>
+                <input type="text" id="mst-meta-artist" maxlength="200"
+                       placeholder="Main artist" autocomplete="off">
+              </label>
+              <label class="mst-meta-field">
+                <span class="mst-meta-lbl">Album</span>
+                <input type="text" id="mst-meta-album" maxlength="200"
+                       placeholder="Album / release name" autocomplete="off">
+              </label>
+              <label class="mst-meta-field mst-meta-field-small">
+                <span class="mst-meta-lbl">Track #</span>
+                <input type="number" id="mst-meta-track" min="1" max="999" step="1"
+                       placeholder="1" autocomplete="off">
+              </label>
+              <label class="mst-meta-field mst-meta-field-small">
+                <span class="mst-meta-lbl">Year</span>
+                <input type="number" id="mst-meta-year" min="1900" max="2100" step="1"
+                       placeholder="2026" autocomplete="off">
+              </label>
+              <label class="mst-meta-field">
+                <span class="mst-meta-lbl">Genre</span>
+                <input type="text" id="mst-meta-genre" maxlength="100"
+                       placeholder="Free text" autocomplete="off">
+              </label>
+            </div>
+            <div class="mst-meta-footer">
+              <span class="mst-meta-footer-hint">
+                Tags are embedded in WAV and MP3 exports. Artist + Album persist
+                across sessions; Title / Track / Year / Genre reset per file.
+              </span>
+              <button type="button" class="mst-meta-clear" id="mst-meta-clear"
+                      title="Clear all metadata fields">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Export -->
+        <!--
+          No format chooser here: WAV 24-bit is the only supported format,
+          so a checkbox for it would exist only to be checked. The format
+          is baked into the button label instead so it's still visible.
+        -->
+        <div class="mst-section-head">Export</div>
+        <button class="mst-btn mst-btn-primary" id="mst-btn-export">
+          Export master · WAV 24-bit &darr;
+        </button>
+      </div>
+
+    </section>
+
+  </main>
+
+  <script src="/static/js/anvil-picker.js"></script>
+  <script src="/static/js/master.js"></script>
+</body>
+</html>

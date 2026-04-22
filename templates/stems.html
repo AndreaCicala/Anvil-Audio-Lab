@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anvil Audio Lab — Stem Analysis</title>
+  <link rel="icon" href="/static/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    .stem-list { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
+    .stem-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); font-size: 13px;
+    }
+    .stem-item-name {
+      flex: 1; font-family: var(--font-mono); color: var(--text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .stem-label-input {
+      width: 140px; background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: 4px; padding: 4px 8px; font-family: var(--font-mono);
+      font-size: 12px; color: var(--text); outline: none;
+    }
+    .stem-label-input:focus { border-color: var(--accent); }
+    .stem-remove {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      font-size: 16px; padding: 0 4px; line-height: 1;
+    }
+    .stem-remove:hover { color: var(--danger); }
+
+    /* Drop zone */
+    .stem-drop {
+      border: 1px dashed var(--border2); border-radius: var(--radius-lg);
+      background: var(--bg2); padding: 48px 24px; text-align: center;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .stem-drop.drag-over { border-color: var(--accent); background: rgba(200,240,80,0.04); }
+    .stem-drop-icon { font-size: 28px; color: var(--muted); margin-bottom: 10px; }
+    .stem-drop-title { font-family: var(--font-head); font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .stem-drop-sub { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+    /* Matrix */
+    .matrix-wrap { overflow-x: auto; }
+    .matrix-table { border-collapse: collapse; width: 100%; font-size: 12px; }
+    .matrix-table th { padding: 8px 12px; color: var(--muted); font-weight: 400; letter-spacing: 0.05em; text-transform: uppercase; font-size: 10px; }
+    .matrix-table td { padding: 8px 12px; text-align: center; border: 1px solid var(--border); }
+    .matrix-cell { display: inline-block; padding: 4px 10px; border-radius: 4px; font-weight: 500; }
+    .matrix-severe   { background: rgba(255,95,87,0.15);   color: var(--danger); }
+    .matrix-moderate { background: rgba(245,166,35,0.15);  color: var(--warn); }
+    .matrix-mild     { background: rgba(123,97,255,0.12);  color: var(--accent2); }
+    .matrix-none     { background: rgba(48,209,88,0.08);   color: var(--ok); }
+    .matrix-self     { background: var(--bg3); color: var(--muted); }
+
+    /* Recommendations */
+    .rec-item {
+      background: var(--bg3); border-radius: var(--radius); padding: 16px 18px;
+      margin-bottom: 12px; border-left: 3px solid var(--border2);
+    }
+    .rec-item.severe   { border-left-color: var(--danger); }
+    .rec-item.moderate { border-left-color: var(--warn); }
+    .rec-item.mild     { border-left-color: var(--accent2); }
+
+    .rec-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .rec-badge { font-size: 10px; padding: 3px 8px; border-radius: 100px; letter-spacing: 0.06em; text-transform: uppercase; }
+    .rec-badge.severe   { background: rgba(255,95,87,0.15);  color: var(--danger); }
+    .rec-badge.moderate { background: rgba(245,166,35,0.15); color: var(--warn); }
+    .rec-badge.mild     { background: rgba(123,97,255,0.12); color: var(--accent2); }
+    .rec-stems { font-size: 12px; color: var(--muted); }
+    .rec-band  { font-size: 11px; padding: 2px 8px; background: var(--bg2); border-radius: 4px; color: var(--muted); }
+    .rec-action { font-size: 13px; color: var(--text); margin-bottom: 8px; }
+    .rec-cubase { font-size: 12px; color: var(--muted); line-height: 1.6; padding: 10px 12px; background: var(--bg2); border-radius: 6px; border-left: 2px solid var(--accent); }
+    .rec-phase  { font-size: 12px; color: var(--warn); margin-top: 8px; padding: 8px 10px; background: rgba(245,166,35,0.06); border-radius: 6px; }
+
+    /* Fingerprint bars */
+    .fp-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .fp-label { width: 60px; font-size: 10px; color: var(--muted); flex-shrink: 0; }
+    .fp-bar-wrap { flex: 1; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+    .fp-bar { height: 100%; border-radius: 3px; }
+    .fp-val { width: 55px; font-size: 10px; font-family: var(--font-mono); color: var(--muted); text-align: right; }
+  </style>
+</head>
+<body>
+
+<header style="display:flex;align-items:center;gap:24px;padding:28px 40px 24px;border-bottom:1px solid var(--border);flex-wrap:nowrap">
+  <div class="logo">
+    <span class="logo-icon">▣</span>
+    <span class="logo-text">ANVIL AUDIO LAB</span>
+  </div>
+  <div class="header-sub">Stem Analysis</div>
+  <nav class="nav-group" style="margin-left:auto;display:flex;gap:8px">
+    <a href="/" class="btn-compare">← Back to analyzer</a>
+    <a href="/master" class="btn-compare">◎ Master</a>
+    <a href="/release" class="btn-compare">✓ Release check</a>
+    <button class="btn-compare" id="btn-stem-history" onclick="toggleStemHistory()">⏱ History</button>
+  </nav>
+</header>
+
+<!-- Floating quick-access: History + Back buttons on scroll -->
+<div class="floating-nav">
+  <a href="/" class="floating-nav-btn" title="Back to analyzer">←</a>
+  <a href="/release" class="floating-nav-btn" title="Release check">✓</a>
+  <button class="floating-nav-btn" onclick="toggleStemHistory()" title="Stem history">⏱</button>
+</div>
+
+<!-- Stem history panel -->
+<div id="stem-history-panel" style="display:none;position:fixed;top:0;right:0;width:320px;height:100vh;background:var(--bg2);border-left:1px solid var(--border);z-index:1000;overflow-y:auto;padding:24px 20px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <span style="font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted)">Recent stem analyses</span>
+    <button onclick="toggleStemHistory()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1">×</button>
+  </div>
+  <div id="stem-history-list">
+    <div style="font-size:13px;color:var(--muted);text-align:center;padding:40px 0">Loading...</div>
+  </div>
+</div>
+<div id="stem-history-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999" onclick="toggleStemHistory()"></div>
+
+<main style="max-width:900px;margin:48px auto 0;padding:0 24px 80px">
+
+  <!-- Tip -->
+  <div style="background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.2);border-radius:var(--radius);padding:14px 18px;margin-bottom:28px;font-size:12px;color:var(--warn);line-height:1.6">
+    <strong>Tip:</strong> Use <strong>group/bus stems</strong> (e.g. "Drum Bus", "Bass Bus") rather than individual tracks for best results.
+    Keep it under <strong>12 stems</strong> for a fast analysis.
+  </div>
+
+  <!-- Drop zone -->
+  <div class="stem-drop" id="drop-zone"
+    ondragover="event.preventDefault();this.classList.add('drag-over')"
+    ondragleave="this.classList.remove('drag-over')"
+    ondrop="handleDrop(event)">
+    <div class="stem-drop-icon">◈</div>
+    <div class="stem-drop-title">Drop stem files here</div>
+    <div class="stem-drop-sub">WAV · AIFF · FLAC · Drop multiple files at once<br>Minimum 2 stems required</div>
+    <div style="display:flex;gap:10px;margin-top:16px;justify-content:center;flex-wrap:wrap">
+      <label class="btn-upload" for="stem-input">Browse files</label>
+      <label class="btn-upload" for="folder-input" style="background:transparent;border:1px solid var(--border2);color:var(--muted)">Browse folder</label>
+    </div>
+    <input type="file" id="stem-input" accept=".wav,.aif,.aiff,.flac" multiple hidden onchange="handleFiles(this.files)">
+    <input type="file" id="folder-input" webkitdirectory multiple hidden onchange="handleFiles(this.files)">
+  </div>
+
+  <!-- Stem list -->
+  <div class="stem-list" id="stem-list"></div>
+
+  <!-- Analyze button -->
+  <button class="btn-analyze" id="btn-analyze" style="width:100%;padding:14px;font-size:15px;margin-bottom:32px;display:none" onclick="runAnalysis()">
+    Analyze stems →
+  </button>
+
+  <!-- Progress -->
+  <div id="progress-panel" class="hidden">
+    <div class="progress-bar-track"><div class="progress-bar-fill" id="progress-fill"></div></div>
+    <p class="progress-label" id="progress-label">Analyzing stems…</p>
+  </div>
+
+  <!-- Results -->
+  <div id="results" class="hidden">
+
+    <!-- Reset / new analysis bar -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+      <button onclick="resetToUpload()" class="btn-compare" style="font-size:12px">← New analysis</button>
+    </div>
+
+    <!-- Summary -->
+    <div id="summary-banner" class="issue-banner" style="margin-bottom:24px"></div>
+
+    <!-- Version banner (shown when previous version detected) -->
+    <div id="version-banner" style="display:none;margin-bottom:20px"></div>
+
+    <!-- Diff card (shown after user clicks Compare) -->
+    <div class="section-card" id="diff-card" style="display:none;margin-bottom:24px">
+      <div class="section-head">
+        <span class="section-title" id="diff-title">Version diff</span>
+        <button id="diff-close" onclick="closeDiffCard()" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px 8px">×</button>
+      </div>
+      <div id="diff-summary" style="font-size:12px;color:var(--muted);margin-bottom:14px"></div>
+      <div id="diff-content"></div>
+    </div>
+
+    <!-- Timeline card (only shown when 3+ versions exist) -->
+    <div class="section-card" id="timeline-card" style="display:none;margin-bottom:24px">
+      <div class="section-head">
+        <span class="section-title">Project timeline</span>
+        <button id="timeline-close" onclick="closeTimelineCard()" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px 8px">×</button>
+      </div>
+      <div id="timeline-content"></div>
+    </div>
+
+    <!-- Masking matrix -->
+    <div class="section-card" id="matrix-card">
+      <div class="section-head">
+        <span class="section-title">Masking matrix</span>
+        <span style="font-size:11px;color:var(--muted)">How much each stem pair competes</span>
+      </div>
+      <div class="matrix-wrap"><table class="matrix-table" id="matrix-table"></table></div>
+      <div style="display:flex;gap:16px;margin-top:12px;font-size:11px;color:var(--muted)">
+        <span><span style="color:var(--danger)">■</span> Severe</span>
+        <span><span style="color:var(--warn)">■</span> Moderate</span>
+        <span><span style="color:var(--accent2)">■</span> Mild</span>
+        <span><span style="color:var(--ok)">■</span> No conflict</span>
+      </div>
+    </div>
+
+    <!-- Stem fingerprints -->
+    <div class="section-card">
+      <div class="section-head"><span class="section-title">Stem profiles</span></div>
+      <div id="fingerprints" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px"></div>
+    </div>
+
+    <!-- Per-band energy share -->
+    <div class="section-card">
+      <div class="section-head">
+        <span class="section-title">Band energy share</span>
+        <span style="font-size:11px;color:var(--muted)">Who owns each frequency range</span>
+      </div>
+      <div id="energy-share"></div>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="section-card">
+      <div class="section-head">
+        <span class="section-title">Fix recommendations</span>
+        <span style="font-size:11px;color:var(--muted)">Cubase-specific, ordered by severity</span>
+      </div>
+      <div id="recommendations"></div>
+    </div>
+
+    <!-- Action summary — prioritized fix list, appears after everything else -->
+    <div class="section-card" id="stem-action-summary-card" style="display:none;margin-top:24px"></div>
+
+  </div>
+</main>
+
+<script src="/static/js/stems.js"></script>
+</body>
+</html>

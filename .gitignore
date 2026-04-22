@@ -1,0 +1,95 @@
+# ─── Python ──────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+wheels/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ─── PyInstaller ─────────────────────────────────────────────────────────
+# We commit the .spec file (it's our build recipe), but not the output.
+*.manifest
+# .spec is kept — it's part of the build config
+
+# ─── Secrets ─────────────────────────────────────────────────────────────
+# NEVER commit API keys. Use a .env file locally, and set env vars in prod.
+.env
+.env.local
+.env.*.local
+*.secret
+secrets.json
+
+# ─── App runtime data ────────────────────────────────────────────────────
+# User uploads, generated reports, and temporary audio files.
+# These are per-user state, not source code.
+#
+# Pattern note: we ignore the CONTENTS of these folders with /* rather than
+# ignoring the folders themselves (uploads/). With a folder pattern, git
+# won't descend into the folder at all, and the !uploads/.gitkeep rule
+# below can't re-include anything. With /*, git descends and the negation
+# works, so .gitkeep files keep the empty folders tracked in fresh clones.
+uploads/*
+reports/*
+master_uploads/*
+master_reports/*
+
+# Keep .gitkeep files so the folders exist after a fresh clone — the app
+# writes to them at runtime and needs them to exist.
+!uploads/.gitkeep
+!reports/.gitkeep
+!master_uploads/.gitkeep
+!master_reports/.gitkeep
+
+# Keep the folders themselves (so the app can write to them on a fresh
+# clone) but ignore their contents. We use .gitkeep files for this.
+!uploads/.gitkeep
+!reports/.gitkeep
+!master_uploads/.gitkeep
+!master_reports/.gitkeep
+
+# ─── IDE / Editor ────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ─── OS ──────────────────────────────────────────────────────────────────
+# Windows
+desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.AppleDouble
+.LSOverride
+._*
+
+# ─── Logs ────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── Testing ─────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ─── Jupyter ─────────────────────────────────────────────────────────────
+.ipynb_checkpoints/

@@ -1,0 +1,10 @@
+flask>=3.0
+librosa>=0.10
+pyloudnorm>=0.1
+soundfile>=0.12
+scipy>=1.10
+numpy>=1.24
+werkzeug>=3.0
+json-repair>=0.28
+anthropic>=0.25
+mutagen>=1.47
