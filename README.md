@@ -1,5 +1,9 @@
 # Anvil Audio Lab
 
+> **Personal project — source is public for reference, but I'm not
+> accepting contributions.** Feel free to fork it for your own use.
+> See `CONTRIBUTING.md` and `LICENSE` for details.
+
 A web-based audio mix inspector and offline mastering tool for Cubase
 (and any DAW). Drop in a WAV export, pick your genre, and get an instant
 report on loudness, spectral balance, stereo image, dynamics, and phase
