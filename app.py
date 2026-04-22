@@ -26,9 +26,50 @@ except ImportError as _e:
     ADVISOR_IMPORT_ERROR = str(_e)
 from stem_analyzer import analyze_stems
 
+# Import version + data-path info. Separated into its own module so it can
+# be imported from PyInstaller specs, tests, or anywhere else without
+# pulling in Flask.
+from version import __version__, GITHUB_OWNER, GITHUB_REPO, is_newer
+
+
+# ---------------------------------------------------------------------------
+# Data paths — where uploaded files, reports, and generated masters live.
+#
+# In development (running from source), this is the project folder, so you
+# can poke at the files directly. In a packaged build (PyInstaller), the
+# app can't reliably write to its own install directory (Program Files is
+# read-only for non-admin users), so we use the per-user data directory:
+#
+#   Windows: %APPDATA%/AnvilAudioLab/
+#   macOS:   ~/Library/Application Support/AnvilAudioLab/
+#   Linux:   ~/.local/share/AnvilAudioLab/
+#
+# The choice is controlled by the ANVIL_DATA_MODE env var, defaulting to
+# "user" (per-user dir). Set ANVIL_DATA_MODE=project to force the dev
+# behavior — useful when iterating on the code and wanting to inspect
+# generated reports directly.
+# ---------------------------------------------------------------------------
+
+from platformdirs import user_data_dir
+
+APP_NAME = "AnvilAudioLab"
+APP_AUTHOR = "AnvilAudioLab"
+
+def _resolve_data_root():
+    mode = (os.environ.get("ANVIL_DATA_MODE") or "user").strip().lower()
+    if mode == "project":
+        # Development mode — use folders next to the code. Handy when
+        # iterating, and when the session-history restore flow wants to
+        # read reports directly.
+        return os.path.abspath(os.path.dirname(__file__))
+    # Default: per-user data directory, portable across OSes.
+    return user_data_dir(APP_NAME, APP_AUTHOR)
+
+DATA_ROOT = _resolve_data_root()
+
 app = Flask(__name__)
-app.config["UPLOAD_FOLDER"] = "uploads"
-app.config["REPORTS_FOLDER"] = "reports"
+app.config["UPLOAD_FOLDER"]   = os.path.join(DATA_ROOT, "uploads")
+app.config["REPORTS_FOLDER"]  = os.path.join(DATA_ROOT, "reports")
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
 
 ALLOWED_EXTENSIONS = {"wav", "wave", "aiff", "aif", "flac"}
@@ -131,12 +172,104 @@ def config():
         builds without the `anthropic` SDK installed (e.g. packaged .exe).
     has_api_key: is ANTHROPIC_API_KEY set? Without it, advice calls will
         fail even if the module itself is importable.
+    version: the app version string. Rendered in the UI footer and used by
+        the update checker to compare against the latest GitHub release.
     """
     has_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
     return jsonify({
         "has_api_key": has_key,
         "advisor_available": ADVISOR_AVAILABLE,
+        "version": __version__,
     })
+
+
+# Simple in-process cache for the update check. The GitHub public API is
+# rate-limited to 60 req/hour per IP, and the user may hit "Check for
+# updates" repeatedly. Cache the last result for 15 minutes — long enough
+# to avoid API hits, short enough that a new release shows up within a
+# reasonable window if the user keeps the app open.
+_UPDATE_CACHE = {"ts": 0.0, "payload": None}
+_UPDATE_CACHE_TTL = 15 * 60   # seconds
+
+
+@app.route("/check-updates")
+def check_updates():
+    """Query the GitHub releases API for the latest release and compare it
+    to the running version.
+
+    Response shape:
+      {
+        current_version:  "0.2.0",
+        latest_version:   "0.3.0" | null,
+        update_available: bool,
+        release_url:      "https://github.com/.../releases/tag/v0.3.0" | null,
+        release_name:     str | null,
+        release_notes:    str | null,      # truncated to 2000 chars
+        published_at:     ISO 8601 | null,
+        error:            str | null       # set if the check itself failed
+      }
+
+    The endpoint is deliberately forgiving: any error (network, 404, rate
+    limit) returns a 200 with `error` populated, so the frontend can show
+    a subtle note without breaking. We don't want a failed update check
+    to look like a crashed app.
+    """
+    # Cache hit path — no network call, responds instantly.
+    now = time.time()
+    if _UPDATE_CACHE["payload"] and (now - _UPDATE_CACHE["ts"]) < _UPDATE_CACHE_TTL:
+        payload = dict(_UPDATE_CACHE["payload"])
+        payload["cached"] = True
+        return jsonify(payload)
+
+    import requests  # local import keeps module-import cost low
+
+    url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
+    result = {
+        "current_version":  __version__,
+        "latest_version":   None,
+        "update_available": False,
+        "release_url":      None,
+        "release_name":     None,
+        "release_notes":    None,
+        "published_at":     None,
+        "error":            None,
+        "cached":           False,
+    }
+    try:
+        # No auth needed for public repos; for private repos this returns 404
+        # (which we report as a clean error rather than crashing).
+        resp = requests.get(url, timeout=5, headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": f"AnvilAudioLab/{__version__}",
+        })
+        if resp.status_code == 404:
+            result["error"] = "No releases found (repo may be private or have no releases yet)."
+        elif resp.status_code == 403:
+            # Rate-limited. Shouldn't hit this in practice given our cache.
+            result["error"] = "GitHub API rate limit reached — try again later."
+        elif resp.status_code != 200:
+            result["error"] = f"GitHub returned status {resp.status_code}"
+        else:
+            data = resp.json()
+            tag = data.get("tag_name")
+            result["latest_version"]   = (tag or "").lstrip("v") or None
+            result["release_url"]      = data.get("html_url")
+            result["release_name"]     = data.get("name")
+            notes = data.get("body") or ""
+            result["release_notes"]    = notes[:2000] if notes else None
+            result["published_at"]     = data.get("published_at")
+            result["update_available"] = is_newer(tag, __version__)
+    except requests.exceptions.Timeout:
+        result["error"] = "Update check timed out."
+    except requests.exceptions.RequestException as e:
+        result["error"] = f"Network error: {e}"
+    except Exception as e:
+        result["error"] = f"Unexpected error: {e}"
+
+    # Cache whatever we got (even errors) so we don't hammer the API
+    _UPDATE_CACHE["ts"] = now
+    _UPDATE_CACHE["payload"] = result
+    return jsonify(result)
 
 
 @app.route("/favicon.ico")
@@ -872,8 +1005,8 @@ from master_engine import (
 )
 from mix_analyzer import load_audio as _ma_load_audio
 
-app.config["MASTER_UPLOADS"] = "master_uploads"
-app.config["MASTER_REPORTS"] = "master_reports"
+app.config["MASTER_UPLOADS"] = os.path.join(DATA_ROOT, "master_uploads")
+app.config["MASTER_REPORTS"] = os.path.join(DATA_ROOT, "master_reports")
 os.makedirs(app.config["MASTER_UPLOADS"], exist_ok=True)
 os.makedirs(app.config["MASTER_REPORTS"], exist_ok=True)
 
@@ -1579,11 +1712,19 @@ def genre_eq_proposal():
 
 
 if __name__ == "__main__":
-    os.makedirs("uploads", exist_ok=True)
-    os.makedirs("reports", exist_ok=True)
-    os.makedirs("master_uploads", exist_ok=True)
-    os.makedirs("master_reports", exist_ok=True)
+    # Ensure all data directories exist under DATA_ROOT. In user mode this
+    # is the first time they're created (%APPDATA%/AnvilAudioLab/...).
+    # In project mode these are just the existing folders next to the code.
+    os.makedirs(app.config["UPLOAD_FOLDER"],  exist_ok=True)
+    os.makedirs(app.config["REPORTS_FOLDER"], exist_ok=True)
+    os.makedirs(app.config["MASTER_UPLOADS"], exist_ok=True)
+    os.makedirs(app.config["MASTER_REPORTS"], exist_ok=True)
+
     key_status = "found in environment" if os.environ.get("ANTHROPIC_API_KEY") else "not set"
-    print(f"\n  Anvil Audio Lab running at http://localhost:5000")
-    print(f"  ANTHROPIC_API_KEY: {key_status}\n")
+    data_mode = (os.environ.get("ANVIL_DATA_MODE") or "user").lower()
+
+    print(f"\n  Anvil Audio Lab v{__version__} running at http://localhost:5000")
+    print(f"  ANTHROPIC_API_KEY: {key_status}")
+    print(f"  Data mode:         {data_mode}")
+    print(f"  Data root:         {DATA_ROOT}\n")
     app.run(debug=True, port=5000)

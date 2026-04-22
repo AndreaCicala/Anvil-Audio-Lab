@@ -1172,3 +1172,129 @@ main {
   background: rgba(255,255,255,0.08);
   color: var(--accent);
 }
+
+/* ── Version chip (in .nav-group) ── */
+.version-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.version-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Update panel overlay ── */
+.anvil-update-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(10,12,16,0.78);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  animation: anvil-fade-in 0.12s ease-out;
+}
+@keyframes anvil-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.anvil-update-panel {
+  width: 100%; max-width: 520px; max-height: 85vh;
+  display: flex; flex-direction: column;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+.anvil-update-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.anvil-update-title {
+  font-family: var(--font-head); font-size: 14px; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text);
+}
+.anvil-update-close {
+  background: transparent; border: none; color: var(--muted);
+  font-size: 22px; cursor: pointer; padding: 0 6px;
+  line-height: 1;
+}
+.anvil-update-close:hover { color: var(--text); }
+
+.anvil-update-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.anvil-update-loading {
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--muted); text-align: center;
+  padding: 20px;
+}
+.anvil-update-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-family: var(--font-mono); font-size: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.anvil-update-label { color: var(--muted); }
+.anvil-update-value { color: var(--text); font-weight: 500; }
+.anvil-update-value.available { color: var(--accent); font-weight: 700; }
+.anvil-update-value.uptodate  { color: var(--muted); }
+
+.anvil-update-banner {
+  padding: 12px 14px; border-radius: 6px;
+  font-family: var(--font-mono); font-size: 12.5px; line-height: 1.5;
+  margin-top: 6px;
+}
+.anvil-update-banner.available {
+  background: rgba(200,240,80,0.08);
+  border: 1px solid rgba(200,240,80,0.3);
+  color: var(--accent);
+}
+.anvil-update-banner.uptodate {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.anvil-update-banner.error {
+  background: rgba(255,95,87,0.08);
+  border: 1px solid rgba(255,95,87,0.3);
+  color: var(--danger);
+}
+
+.anvil-update-notes-label {
+  font-family: var(--font-head); font-size: 11px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted); margin-top: 4px;
+}
+.anvil-update-notes {
+  font-family: var(--font-mono); font-size: 11.5px; line-height: 1.55;
+  color: var(--text); background: var(--bg3);
+  padding: 12px 14px; border-radius: 6px;
+  white-space: pre-wrap; word-wrap: break-word;
+  max-height: 200px; overflow-y: auto;
+  border: 1px solid var(--border);
+  margin: 0;
+}
+.anvil-update-btn {
+  display: inline-block;
+  padding: 10px 18px; margin-top: 4px;
+  background: var(--accent); color: #0a0c10;
+  font-family: var(--font-head); font-size: 12px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  border-radius: 6px; text-decoration: none;
+  text-align: center;
+  transition: filter 0.12s;
+}
+.anvil-update-btn:hover { filter: brightness(1.08); }
+.anvil-update-error {
+  font-family: var(--font-mono); font-size: 11.5px;
+  color: var(--muted); padding: 0 14px;
+}

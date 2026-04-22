@@ -8,3 +8,5 @@ werkzeug>=3.0
 json-repair>=0.28
 anthropic>=0.25
 mutagen>=1.47
+platformdirs>=4.0
+requests>=2.31
