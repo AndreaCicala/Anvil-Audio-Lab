@@ -26,6 +26,18 @@ pip-delete-this-directory.txt
 *.manifest
 # .spec is kept — it's part of the build config
 
+# PyInstaller build output — these are platform-specific, large (~300 MB),
+# and reproducible from the .spec. Keep them out of git.
+dist/
+build/
+
+# Bundled ffmpeg — user downloads this into ./ffmpeg/ffmpeg.exe before
+# building the Windows binary. The binary is ~100 MB and platform-specific.
+# Not suitable for version control. Keep the folder documentation visible.
+ffmpeg/*
+!ffmpeg/.gitkeep
+!ffmpeg/README.md
+
 # ─── Secrets ─────────────────────────────────────────────────────────────
 # NEVER commit API keys. Use a .env file locally, and set env vars in prod.
 .env
@@ -50,13 +62,6 @@ master_reports/*
 
 # Keep .gitkeep files so the folders exist after a fresh clone — the app
 # writes to them at runtime and needs them to exist.
-!uploads/.gitkeep
-!reports/.gitkeep
-!master_uploads/.gitkeep
-!master_reports/.gitkeep
-
-# Keep the folders themselves (so the app can write to them on a fresh
-# clone) but ignore their contents. We use .gitkeep files for this.
 !uploads/.gitkeep
 !reports/.gitkeep
 !master_uploads/.gitkeep

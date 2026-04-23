@@ -12,6 +12,7 @@ Output:
 """
 
 import sys
+import os
 import json
 import argparse
 import warnings
@@ -460,12 +461,62 @@ def true_peak_db(signal):
 # Analysis modules
 # ---------------------------------------------------------------------------
 
+def _resolve_ffmpeg_binary():
+    """Return the path (or bare name) to use when invoking ffmpeg.
+
+    Lookup order:
+      1. ANVIL_FFMPEG env var — explicit override, wins over everything.
+      2. Bundled binary next to the executable (PyInstaller) or next to the
+         main script (dev). On Windows that's `ffmpeg/ffmpeg.exe`, on
+         macOS/Linux `ffmpeg/ffmpeg`. We ship ffmpeg this way in packaged
+         builds so users don't need a separate install.
+      3. Bare "ffmpeg" — assumes it's on PATH. The fallback for dev machines
+         that have ffmpeg installed system-wide.
+
+    The result is cached in a module-level so we don't hit the filesystem
+    on every measurement call.
+    """
+    global _FFMPEG_CACHED
+    try:
+        return _FFMPEG_CACHED
+    except NameError:
+        pass
+
+    # 1. Env var override
+    env = os.environ.get("ANVIL_FFMPEG")
+    if env and os.path.exists(env):
+        _FFMPEG_CACHED = env
+        return _FFMPEG_CACHED
+
+    # 2. Bundled ffmpeg
+    # In a PyInstaller onedir bundle, sys.executable points at the exe and
+    # sys._MEIPASS / os.path.dirname(sys.executable) is where data files
+    # get placed. In dev, we use the project root (the folder containing
+    # mix_analyzer.py).
+    if getattr(sys, "frozen", False):
+        # Running inside PyInstaller
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.abspath(os.path.dirname(__file__))
+
+    exe_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+    bundled = os.path.join(base, "ffmpeg", exe_name)
+    if os.path.exists(bundled):
+        _FFMPEG_CACHED = bundled
+        return _FFMPEG_CACHED
+
+    # 3. System PATH fallback
+    _FFMPEG_CACHED = "ffmpeg"
+    return _FFMPEG_CACHED
+
+
 def measure_ffmpeg(filepath):
     """Use ffmpeg ebur128 for accurate LUFS, LRA, and true peak (BS.1770-4 compliant)."""
     import subprocess, re
+    ffmpeg_bin = _resolve_ffmpeg_binary()
     try:
         result = subprocess.run(
-            ["ffmpeg", "-i", filepath, "-af", "ebur128=peak=true", "-f", "null", "-"],
+            [ffmpeg_bin, "-i", filepath, "-af", "ebur128=peak=true", "-f", "null", "-"],
             capture_output=True, text=True, timeout=120
         )
         output = result.stderr + result.stdout
