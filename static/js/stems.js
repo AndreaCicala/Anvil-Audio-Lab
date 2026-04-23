@@ -919,12 +919,21 @@ function renderFingerprints(data) {
   const stemNames = Object.keys(data.stems);
   const minDb = -70, maxDb = 0;
 
+  // Only show parent bands in the Stem Profiles card. The fingerprint
+  // object ALSO contains 24 sub-bands (keys like "sub_0", "bass_1", etc.)
+  // which are used internally for conflict localization — showing them
+  // all here would produce 30 rows per stem of mostly-redundant detail,
+  // and sub-band keys don't have entries in BAND_LABELS so they'd render
+  // as "undefined".
+  const PARENT_ORDER = ["sub", "bass", "low_mid", "mid", "presence", "air"];
+
   el.innerHTML = stemNames.map((name, idx) => {
     const stem = data.stems[name];
     const fp   = stem.fingerprint;
     const color = COLORS[idx % COLORS.length];
 
-    const bars = Object.entries(fp).map(([band, db]) => {
+    const bars = PARENT_ORDER.filter(b => b in fp).map(band => {
+      const db = fp[band];
       const pct = Math.max(0, ((db - minDb) / (maxDb - minDb)) * 100);
       return `<div class="fp-row">
         <div class="fp-label">${BAND_LABELS[band]}</div>
